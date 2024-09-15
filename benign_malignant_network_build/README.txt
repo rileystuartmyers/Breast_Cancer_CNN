@@ -8,5 +8,3 @@ Throughout training, the model hasn't been able to achieve above ~70% accuracy, 
   - Too much noise in the input images, as many of them have signatures in the top corners or surrounding white/gray lines.
 
   - The actual parameters of the model may not be optimal (ex. using RELU instead of sigmoid, or choosing to use an unoptimal number of neurons for each layers, etc.)
-
-  - The dataset just doesn't leave room for a model to derive from it :/
