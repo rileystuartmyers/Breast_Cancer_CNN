@@ -1,4 +1,4 @@
-Attempt at a CNN model that performs binary classification tasks between XRAY images of breasts that have either 'benign' or 'malignant' calcifications.
+Attempt at a CNN model that performs binary classification tasks between XRAY images that have either 'benign' or 'malignant' calcifications.
 
 Throughout training, the model hasn't been able to achieve above ~70% accuracy, which I believe can be attributed to one or more of the following...
 
