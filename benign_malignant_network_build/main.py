@@ -209,8 +209,7 @@ def train_network(DIMENSION):
     model.add(Flatten())
 
     model.add(Dense(128, activation = 'relu'))
-    model.add(Dense(2, activation = "sigmoid"))
-
+    model.add(Dense(3, activation = "sigmoid")) #for classification of 2 classes, use model.add(Dense(2, activation = 'relu'))
     model.summary()
 
     model.compile(optimizer="adam",loss="sparse_categorical_crossentropy",metrics=["accuracy"])
