@@ -1,3 +1,7 @@
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.layers import Dense, Flatten, Conv2D, MaxPooling2D, BatchNormalization
 import os
 import cv2
 import matplotlib.pyplot as plt
@@ -5,239 +9,140 @@ import pandas as pd
 import numpy as np
 
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score,classification_report,confusion_matrix
-from sklearn.model_selection import train_test_split
-
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 import shutil
 
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
-from tensorflow.keras.layers import Dense, Flatten,Conv2D,MaxPooling2D,BatchNormalization    # type: ignore
-from tensorflow.keras.preprocessing.image import ImageDataGenerator                          # type: ignore
-from tensorflow.keras.models import Sequential                                               # type: ignore
-from tensorflow.keras.callbacks import EarlyStopping                                         # type: ignore
 
-source_folder_parent = r"breast_cancimg\jpeg"
+# Paths for train and test directories
+train_path = r"/Users/gabe/DS2 Project/Breast_Cancer_CNN/benign_malignant_network_build/train"
+test_path = r"/Users/gabe/DS2 Project/Breast_Cancer_CNN/benign_malignant_network_build/test"
 
-#dicom_info = pd.read_csv(r"breast_cancimg\csv\dicom_info.csv")
-#mass_case_desc_test_set = pd.read_csv(r"breast_cancimg\csv\mass_case_description_test_set.csv")
-#mass_case_desc_train_set = pd.read_csv(r"breast_cancimg\csv\mass_case_description_train_set.csv")
-#meta = pd.read_csv(r"breast_cancimg\csv\meta.csv")
-#calc_case_desc_test_set = pd.read_csv(r"breast_cancimg\csv\calc_case_description_test_set.csv")
-#calc_case_desc_train_set = pd.read_csv(r"breast_cancimg\csv\calc_case_description_train_set.csv")
+# Function to get paths for a specified image type (image_files, cropped_files, ROI_mask_files) and classification
 
-train_path = r"breast_cancer_CNN\train\image_files"
-test_path = r"breast_cancer_CNN\test\image_files"
 
-benign_train_path = r"breast_cancer_CNN\train\image_files\BENIGN"
-benign_without_callback_train_path = r"breast_cancer_CNN\train\image_files\BENIGN_WITHOUT_CALLBACK"
-malignant_train_path = r"breast_cancer_CNN\train\image_files\MALIGNANT"
+def get_image_paths(image_type, classification, data_split='train'):
+    base_path = train_path if data_split == 'train' else test_path
+    return os.path.join(base_path, image_type, classification)
 
-benign_test_path = r"breast_cancer_CNN\test\image_files\BENIGN"
-benign_without_callback_test_path = r"breast_cancer_CNN\test\image_files\BENIGN_WITHOUT_CALLBACK"
-malignant_test_path = r"breast_cancer_CNN\test\image_files\MALIGNANT"
+
+# Image paths for training data
+benign_image_files_train = get_image_paths("image_files", "BENIGN", "train")
+benign_without_callback_image_files_train = get_image_paths(
+    "image_files", "BENIGN_WITHOUT_CALLBACK", "train")
+malignant_image_files_train = get_image_paths(
+    "image_files", "MALIGNANT", "train")
+
+# Image paths for testing data
+benign_image_files_test = get_image_paths("image_files", "BENIGN", "test")
+benign_without_callback_image_files_test = get_image_paths(
+    "image_files", "BENIGN_WITHOUT_CALLBACK", "test")
+malignant_image_files_test = get_image_paths(
+    "image_files", "MALIGNANT", "test")
 
 
 def image_paths(folder):
-
     image_paths = []
-
     for filename in os.listdir(folder):
-
         image_paths.append(filename)
-
     return image_paths
 
+
 def load_images(folder, dimension):
-
     images = []
-
     for filename in os.listdir(folder):
-
         img = cv2.imread(os.path.join(folder, filename))
-
         if img is not None:
-
-            #greyscaled_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             resized_img = cv2.resize(img, (dimension, dimension))
             images.append(resized_img)
-
     return images
+
 
 def single_image_formatting(directory, dimension):
-
     images = []
-    
     img = cv2.imread(directory)
-    #greyscaled_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     resized_img = cv2.resize(img, (dimension, dimension))
-    
     images.append(resized_img)
-
     images = np.array(images)
-
     images = images / 255.0
-    
     return images
 
-def final_prediction(predicted_value):
 
-    output_statement = ""
-    
-    val = np.round(predicted_value)
+def train_network(DIMENSION, image_type="image_files"):
+    # Update paths based on selected image type
+    train_dir = os.path.join(train_path, image_type)
+    test_dir = os.path.join(test_path, image_type)
 
-    if (val == 0):
-
-        output_statement = "happy"
-
-    else:
-
-        output_statement = "sad"
-
-    return output_statement
-
-def copy_tabled_images_to_path(tableset, source_folder_parent, train_or_test, image_type):
-
-    #source_folder_parent is stand-in for folder location of 'jpeg'
-
-    #image_type refers to one of three image types among images in the 'jpeg' folder: image, cropped, and ROI_mask
-
-    image_csv_string = ""
-
-    if (image_type == "image"):
-    
-        image_csv_string = "image file path"
-
-    elif (image_type == "cropped"):
-    
-        image_csv_string = "cropped image file path"
-
-    else:
-    
-        image_csv_string = "ROI mask file path"
-
-    
-    for case in range(len(tableset)):
-
-        #patient_id = tableset['patient_id'][case]
-        path_segments = tableset[image_csv_string][case]
-        pathology = tableset['pathology'][case]
-
-        first_index = path_segments.find("/")
-        second_index = path_segments.find("/", first_index + 1)
-        third_index = path_segments.find("/", second_index + 1)
-
-        direct_folder_path = path_segments[second_index + 1:third_index]
-        
-        source_folder = source_folder_parent + "\\" + direct_folder_path
-
-        print(source_folder) 
-
-        if ((os.path.exists(source_folder)) == False):
-
-            print(direct_folder_path + " does not exist.")
-            continue
-
-        source_dir = os.listdir(source_folder)
-
-        if ((image_type != "image") and (image_type != "cropped")):
-
-            for image in source_dir:
-
-                if (image[0] == "2"):
-
-                    image_path = source_folder + "\\" + image
-
-                    shutil.copy(image_path, "breast_cancer_CNN" + "\\" + train_or_test + "\\" + image_type + "_files" + "\\" + pathology + "\\" + image)
-
-        else:
-
-            for image in source_dir:
-
-                if (image[0] == "1"):
-
-                    image_path = source_folder + "\\" + image
-
-                    shutil.copy(image_path, "breast_cancer_CNN" + "\\" + train_or_test + "\\" + image_type + "_files" + "\\" + pathology + "\\" + image)
-
-
-def train_network(DIMENSION):
-
-    benign_train = load_images(benign_train_path, DIMENSION)
-    benign_without_callback_train = load_images(benign_without_callback_train_path, DIMENSION)
-    malignant_train = load_images(malignant_train_path, DIMENSION)
-
-    benign_test = load_images(benign_test_path, DIMENSION)
-    benign_without_callback_test = load_images(benign_without_callback_test_path, DIMENSION)
-    malignant_test = load_images(malignant_test_path, DIMENSION)
-
-    X_train = benign_train + malignant_train + benign_without_callback_train
-    X_test = benign_test + malignant_test + benign_without_callback_test
-
-    X_train = np.array(X_train)
-    X_train = X_train / 255.0
-
-    X_test = np.array(X_test)
-    X_test = X_test / 255.0
-
+    # Image augmentation
     datagen = ImageDataGenerator(
-
-        shear_range = 0.2,
-        zoom_range = 0.2,
-        horizontal_flip = True,
-        vertical_flip = True,
-        rotation_range = 30
-
+        rescale=1./255,  # Normalize pixel values
+        shear_range=0.2,
+        zoom_range=0.2,
+        horizontal_flip=True,
+        vertical_flip=True,
+        rotation_range=30
     )
 
-    train_dataset = datagen.flow_from_directory(train_path, class_mode = "binary")
-    test_dataset = datagen.flow_from_directory(test_path, class_mode = "binary")
+    # Load training data directly using ImageDataGenerator
+    train_dataset = datagen.flow_from_directory(
+        train_dir,
+        target_size=(DIMENSION, DIMENSION),
+        batch_size=32,
+        class_mode='binary'  # Use 'categorical' if you have more than 2 classes
+    )
 
-    y_train = train_dataset.classes
-    y_test = test_dataset.classes
+    # Load test data directly using ImageDataGenerator
+    test_dataset = datagen.flow_from_directory(
+        test_dir,
+        target_size=(DIMENSION, DIMENSION),
+        batch_size=32,
+        class_mode='binary'
+    )
 
-    model=Sequential()
-
-    model.add(Conv2D(32,(3,3),activation="relu",input_shape=(DIMENSION, DIMENSION, 3)))
-    
-    model.add(MaxPooling2D(2,2))
-
-    model.add(Conv2D(64,(3,3),activation="relu"))
-    
-    model.add(MaxPooling2D(2,2))
-
+    # Define CNN model
+    model = Sequential()
+    model.add(Conv2D(32, (3, 3), activation="relu",
+              input_shape=(DIMENSION, DIMENSION, 3)))
+    model.add(MaxPooling2D(2, 2))
+    model.add(Conv2D(64, (3, 3), activation="relu"))
+    model.add(MaxPooling2D(2, 2))
     model.add(Flatten())
+    model.add(Dense(128, activation='relu'))
+    # Use 'softmax' for multi-class classification
+    model.add(Dense(3, activation="softmax"))
 
-    model.add(Dense(128, activation = 'relu'))
-    model.add(Dense(3, activation = "sigmoid")) #for classification of 2 classes, use model.add(Dense(2, activation = 'relu'))
-    model.summary()
+    model.compile(optimizer="adam",
+                  loss="sparse_categorical_crossentropy", metrics=["accuracy"])
 
-    model.compile(optimizer="adam",loss="sparse_categorical_crossentropy",metrics=["accuracy"])
+    # Early stopping
+    early_stop = EarlyStopping(
+        monitor="val_loss", mode="min", verbose=1, patience=5)
 
-    early_stop = EarlyStopping(monitor="val_loss",mode="min",verbose=1,patience=5)
+    # Model training
+    history = model.fit(
+        train_dataset,
+        validation_data=test_dataset,
+        epochs=30,
+        callbacks=[early_stop]
+    )
 
-    history=model.fit(X_train, y_train, validation_data = (X_test, y_test), epochs=30, callbacks = [early_stop], shuffle=True)
+    # Model evaluation
+    y_pred = model.predict(test_dataset)
+    y_pred_r = np.argmax(y_pred, axis=1)
+    y_test = test_dataset.classes  # Get true labels
 
-    y_pred = model.predict(X_test)
-
-    y_pred_r = np.argmax(y_pred, axis = 1) 
-
-    output_list = list(zip(y_pred_r, y_test))
-    for x in output_list:
-
-        print(x)
-
+    # Print accuracy and evaluation metrics
     acc_score = accuracy_score(y_pred_r, y_test)
     print("Accuracy Score: ", acc_score)
-
     print("Classification Report: ")
-    print(classification_report(y_pred_r, y_test))
-
+    print(classification_report(y_test, y_pred_r))
     print("Confusion Matrix: ")
-    print(confusion_matrix(y_pred_r, y_test))
-
+    print(confusion_matrix(y_test, y_pred_r))
     print("==================================================\n")
 
     return acc_score
 
-train_network(700)
+
+# Run the training using image files
+train_network(700, image_type="image_files")
