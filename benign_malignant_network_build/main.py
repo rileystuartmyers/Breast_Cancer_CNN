@@ -3,7 +3,6 @@ import cv2
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score,classification_report,confusion_matrix
 from sklearn.model_selection import train_test_split
@@ -11,32 +10,23 @@ from sklearn.model_selection import train_test_split
 import shutil
 
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-
-from tensorflow.keras.layers import Dense, Flatten,Conv2D,MaxPooling2D,BatchNormalization    # type: ignore
+import tensorflow as tf
+from tensorflow.keras.layers import Dense, Flatten,Conv2D,MaxPooling2D,BatchNormalization, Dropout    # type: ignore
 from tensorflow.keras.preprocessing.image import ImageDataGenerator                          # type: ignore
 from tensorflow.keras.models import Sequential                                               # type: ignore
-from tensorflow.keras.callbacks import EarlyStopping                                         # type: ignore
+from tensorflow.keras.callbacks import EarlyStopping
 
-source_folder_parent = r"breast_cancimg\jpeg"
 
-#dicom_info = pd.read_csv(r"breast_cancimg\csv\dicom_info.csv")
-#mass_case_desc_test_set = pd.read_csv(r"breast_cancimg\csv\mass_case_description_test_set.csv")
-#mass_case_desc_train_set = pd.read_csv(r"breast_cancimg\csv\mass_case_description_train_set.csv")
-#meta = pd.read_csv(r"breast_cancimg\csv\meta.csv")
-#calc_case_desc_test_set = pd.read_csv(r"breast_cancimg\csv\calc_case_description_test_set.csv")
-#calc_case_desc_train_set = pd.read_csv(r"breast_cancimg\csv\calc_case_description_train_set.csv")
+source_folder_parent = r"D:\VSC Workspace\breast_cancimg\jpeg"
 
-train_path = r"breast_cancer_CNN\train\image_files"
-test_path = r"breast_cancer_CNN\test\image_files"
+dicom_info = pd.read_csv(r"D:\VSC Workspace\breast_cancimg\csv\dicom_info.csv")
+mass_case_desc_test_set = pd.read_csv(r"D:\VSC Workspace\breast_cancimg\csv\mass_case_description_test_set.csv")
+mass_case_desc_train_set = pd.read_csv(r"D:\VSC Workspace\breast_cancimg\csv\mass_case_description_train_set.csv")
+meta = pd.read_csv(r"D:\VSC Workspace\breast_cancimg\csv\meta.csv")
+calc_case_desc_test_set = pd.read_csv(r"D:\VSC Workspace\breast_cancimg\csv\calc_case_description_test_set.csv")
+calc_case_desc_train_set = pd.read_csv(r"D:\VSC Workspace\breast_cancimg\csv\calc_case_description_train_set.csv")
 
-benign_train_path = r"breast_cancer_CNN\train\image_files\BENIGN"
-benign_without_callback_train_path = r"breast_cancer_CNN\train\image_files\BENIGN_WITHOUT_CALLBACK"
-malignant_train_path = r"breast_cancer_CNN\train\image_files\MALIGNANT"
-
-benign_test_path = r"breast_cancer_CNN\test\image_files\BENIGN"
-benign_without_callback_test_path = r"breast_cancer_CNN\test\image_files\BENIGN_WITHOUT_CALLBACK"
-malignant_test_path = r"breast_cancer_CNN\test\image_files\MALIGNANT"
-
+DIMENSION = 200
 
 def image_paths(folder):
 
@@ -137,7 +127,7 @@ def copy_tabled_images_to_path(tableset, source_folder_parent, train_or_test, im
 
             print(direct_folder_path + " does not exist.")
             continue
-
+        
         source_dir = os.listdir(source_folder)
 
         if ((image_type != "image") and (image_type != "cropped")):
@@ -147,7 +137,7 @@ def copy_tabled_images_to_path(tableset, source_folder_parent, train_or_test, im
                 if (image[0] == "2"):
 
                     image_path = source_folder + "\\" + image
-
+                    print(image_path)
                     shutil.copy(image_path, "breast_cancer_CNN" + "\\" + train_or_test + "\\" + image_type + "_files" + "\\" + pathology + "\\" + image)
 
         else:
@@ -157,28 +147,12 @@ def copy_tabled_images_to_path(tableset, source_folder_parent, train_or_test, im
                 if (image[0] == "1"):
 
                     image_path = source_folder + "\\" + image
+                    print(image_path)
 
                     shutil.copy(image_path, "breast_cancer_CNN" + "\\" + train_or_test + "\\" + image_type + "_files" + "\\" + pathology + "\\" + image)
 
 
-def train_network(DIMENSION):
-
-    benign_train = load_images(benign_train_path, DIMENSION)
-    benign_without_callback_train = load_images(benign_without_callback_train_path, DIMENSION)
-    malignant_train = load_images(malignant_train_path, DIMENSION)
-
-    benign_test = load_images(benign_test_path, DIMENSION)
-    benign_without_callback_test = load_images(benign_without_callback_test_path, DIMENSION)
-    malignant_test = load_images(malignant_test_path, DIMENSION)
-
-    X_train = benign_train + malignant_train + benign_without_callback_train
-    X_test = benign_test + malignant_test + benign_without_callback_test
-
-    X_train = np.array(X_train)
-    X_train = X_train / 255.0
-
-    X_test = np.array(X_test)
-    X_test = X_test / 255.0
+def train_network(X_train, X_test, DIMENSION, train_path, test_path, classes_num, end_activation):
 
     datagen = ImageDataGenerator(
 
@@ -186,7 +160,7 @@ def train_network(DIMENSION):
         zoom_range = 0.2,
         horizontal_flip = True,
         vertical_flip = True,
-        rotation_range = 30
+        rotation_range = 40
 
     )
 
@@ -198,21 +172,35 @@ def train_network(DIMENSION):
 
     model=Sequential()
 
-    model.add(Conv2D(32,(3,3),activation="relu",input_shape=(DIMENSION, DIMENSION, 3)))
-    
+    model.add(Conv2D(128,(3,3),activation="relu",input_shape=(DIMENSION, DIMENSION, 3)))
+
+    model.add(BatchNormalization())
+
     model.add(MaxPooling2D(2,2))
 
-    model.add(Conv2D(64,(3,3),activation="relu"))
-    
+    model.add(Dropout(0.2))
+
+    model.add(Conv2D(128,(3,3),activation="relu"))
+
     model.add(MaxPooling2D(2,2))
+
+    model.add(Dropout(0.2))
+
+    model.add(Conv2D(64, (3, 3), activation = "relu"))
+
+    model.add(MaxPooling2D(2, 2))
 
     model.add(Flatten())
 
-    model.add(Dense(128, activation = 'relu'))
-    model.add(Dense(3, activation = "sigmoid")) #for classification of 2 classes, use model.add(Dense(2, activation = 'relu'))
+    model.add(Dense(64, activation = "relu"))
+
+    model.add(Dense(8, activation = "relu"))
+    
+    model.add(Dense(classes_num, activation = end_activation))
+
     model.summary()
 
-    model.compile(optimizer="adam",loss="sparse_categorical_crossentropy",metrics=["accuracy"])
+    model.compile(optimizer="adam", loss= tf.keras.losses.SparseCategoricalCrossentropy(from_logits = True),metrics=["accuracy"])
 
     early_stop = EarlyStopping(monitor="val_loss",mode="min",verbose=1,patience=5)
 
@@ -220,24 +208,66 @@ def train_network(DIMENSION):
 
     y_pred = model.predict(X_test)
 
+    print("Y_pred: ", y_pred)
+
     y_pred_r = np.argmax(y_pred, axis = 1) 
 
-    output_list = list(zip(y_pred_r, y_test))
-    for x in output_list:
+    print("Y_pred_r: ", y_pred_r)
 
-        print(x)
+    #output_list = list(zip(y_pred_r, y_test))
+    #for x in output_list:
+
+    #    print(x)
 
     acc_score = accuracy_score(y_pred_r, y_test)
     print("Accuracy Score: ", acc_score)
 
-    print("Classification Report: ")
-    print(classification_report(y_pred_r, y_test))
-
     print("Confusion Matrix: ")
     print(confusion_matrix(y_pred_r, y_test))
 
-    print("==================================================\n")
+    plt.plot(history.history['accuracy'], label = 'accuracy')
+    plt.plot(history.history['val_accuracy'], label = 'val_accuracy')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.ylim([0.5, 1])
+    plt.legend(loc = 'lower right')
 
-    return acc_score
+    test_loss, test_acc = model.evaluate(X_test,  y_test, verbose=2)
 
-train_network(700)
+    print("Test Accuracy == ", test_acc)
+
+    return model
+
+
+
+train_path6 = r"D:\VSC Workspace\combined_dataset\train\cropped_files"
+test_path6 = r"D:\VSC Workspace\combined_dataset\test\cropped_files"
+
+benign_train_path6 = r"D:\VSC Workspace\combined_dataset\train\cropped_files\BENIGN"
+benign_without_callback_train_path6 = r"D:\VSC Workspace\combined_dataset\train\cropped_files\BENIGN_WITHOUT_CALLBACK"
+malignant_train_path6 = r"D:\VSC Workspace\combined_dataset\train\cropped_files\MALIGNANT"
+
+benign_test_path6 = r"D:\VSC Workspace\combined_dataset\test\cropped_files\BENIGN"
+benign_without_callback_test_path6 = r"D:\VSC Workspace\combined_dataset\test\cropped_files\BENIGN_WITHOUT_CALLBACK"
+malignant_test_path6 = r"D:\VSC Workspace\combined_dataset\test\cropped_files\MALIGNANT"
+
+benign_train6 = load_images(benign_train_path6, DIMENSION)
+benign_without_callback_train6 = load_images(benign_without_callback_train_path6, DIMENSION)
+malignant_train6 = load_images(malignant_train_path6, DIMENSION)
+
+benign_test6 = load_images(benign_test_path6, DIMENSION)
+benign_without_callback_test6 = load_images(benign_without_callback_test_path6, DIMENSION)
+malignant_test6 = load_images(malignant_test_path6, DIMENSION)
+
+
+X_train6 = benign_train6 + malignant_train6 + benign_without_callback_train6
+X_test6 = benign_test6 + malignant_test6 + benign_without_callback_test6
+
+X_train6 = np.array(X_train6)
+X_train6 = X_train6 / 255.0
+
+X_test6 = np.array(X_test6)
+X_test6 = X_test6 / 255.0
+
+
+model6 = train_network(X_train6, X_test6, DIMENSION, train_path6, test_path6, 3, "relu")
