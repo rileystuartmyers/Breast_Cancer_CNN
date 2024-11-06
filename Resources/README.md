@@ -3,4 +3,5 @@
 # Resources/Models: 
 Contains current model release (Resnet101Model), and alternative models to use in comparison.
 
-# Resources/Results_and_Graphics: Various compiled models and their histories. Used for both parameter tuning and analysis of results.
+# Resources/Results_and_Graphics: 
+Various compiled models and their histories. Used for both parameter tuning and analysis of results.
