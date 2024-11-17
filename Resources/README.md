@@ -1,5 +1,11 @@
-# ***NOTE: The files listed below should be recompiled as current uploaded versions don't contain output of all cells!***
-  ***Results_and_Graphics/Resnet50_VS_Resnet101_VS_VGG16.ipynb***
+# **NOTE: The files listed below should be recompiled as current uploaded versions don't contain output of all cells!**
+  **Results_and_Graphics/Resnet50_VS_Resnet101_VS_VGG16.ipynb**
+
+
+
+
+
+
     
 # Resources/Models: 
 Contains current model release (Resnet101Model), and alternative models to use in comparison.
